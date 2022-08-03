@@ -33,7 +33,7 @@ public class LoginServiceImpl implements LoginService {
         String jwt = JwtUtil.createJWT(user.getId().toString());
 
         Map<String, String> map = new HashMap<>();
-        map.put("error message","Success");
+        map.put("error_message","Success");
         map.put("token",jwt);
 
         return map;
