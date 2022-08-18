@@ -1,13 +1,60 @@
 <template>
-        <GamePlayground />
+        <GamePlayground v-if="$store.state.pk.status === 'playing'"/>
+        <GameMatchground v-if="$store.state.pk.status === 'matching'"/>
 </template>
 
 <script>
 import GamePlayground from "../../components/GamePlayground.vue"
+import GameMatchground from "../../components/GameMatchground.vue"
+import { onMounted, onUnmounted } from 'vue'
+import { useStore } from 'vuex'
 
 export default {
     components: {
-    GamePlayground
+        GamePlayground,
+        GameMatchground,
+    },
+    setup(){
+        const store = useStore();
+        const socketUrl = `ws://127.0.0.1:3000/websocket/${store.state.user.token}/`;
+
+        let socket = null;
+        onMounted(() => {
+            store.commit("updateOpponent", {
+                username: "我的对手",
+                photo: "https://cdn.acwing.com/media/article/image/2022/08/09/1_1db2488f17-anonymous.png",
+            })
+            socket = new WebSocket(socketUrl);
+
+            socket.onopen = () => {
+                console.log("connected!");
+                store.commit("updateSocket", socket);
+            }
+
+            socket.onmessage = msg =>{
+                const data = JSON.parse(msg.data);
+                if(data.event === "start-matching"){
+                    store.commit("updateOpponent",{
+                        username: data.opponent_username,
+                        photo: data.opponent_photo,
+                    })
+                    setTimeout(() => {
+                        store.commit("updateStatus", "playing");
+                    }, 2000)
+                    store.commit("updateGame",data.game);
+                }
+                console.log(data);
+            }
+
+            socket.onclose = () =>{
+                console.log("disconnected!");
+            }
+        });
+
+        onUnmounted(() => {
+            socket.close();
+            store.commit("updateStatus", "matching");
+        });
     }
 }
 
