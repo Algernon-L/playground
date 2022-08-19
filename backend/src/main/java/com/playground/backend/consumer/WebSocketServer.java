@@ -4,7 +4,9 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.playground.backend.consumer.utils.Game;
 import com.playground.backend.consumer.utils.JwtAuthentication;
+import com.playground.backend.mapper.RecordMapper;
 import com.playground.backend.mapper.UserMapper;
+import com.playground.backend.pojo.Record;
 import com.playground.backend.pojo.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -22,16 +24,21 @@ import java.util.concurrent.CopyOnWriteArraySet;
 public class WebSocketServer {
 
     // 保存所有链接
-    final private static ConcurrentHashMap<Integer, WebSocketServer> users = new ConcurrentHashMap<>();
+    final public static ConcurrentHashMap<Integer, WebSocketServer> users = new ConcurrentHashMap<>();
     final private static CopyOnWriteArraySet<User> matchpool = new CopyOnWriteArraySet<>();
     private User user;
     private Session session = null;
 
     private static UserMapper userMapper;
+    public static RecordMapper recordMapper;
+    private Game game = null;
     @Autowired
     public void setUserMapper(UserMapper userMapper){
         WebSocketServer.userMapper = userMapper;
     }
+
+    @Autowired
+    public void setRecordMapper(RecordMapper recordMapper){WebSocketServer.recordMapper = recordMapper;}
 
     @OnOpen
     public void onOpen(Session session, @PathParam("token") String token) throws IOException {
@@ -71,6 +78,10 @@ public class WebSocketServer {
 
             Game game = new Game(13,14, 20, a.getId(), b.getId());
             game.createMap();
+            game.start();
+
+            users.get(a.getId()).game = game;
+            users.get(b.getId()).game = game;
 
             JSONObject respGame = new JSONObject();
             respGame.put("a_id", game.getPlayerA().getId());
@@ -102,6 +113,14 @@ public class WebSocketServer {
         matchpool.remove(this.user);
     }
 
+    private void move(int direction){
+        if(game.getPlayerA().getId().equals(user.getId())){
+            game.setNextStepA(direction);
+        }else if(game.getPlayerB().getId().equals(user.getId())){
+            game.setNextStepB(direction);
+        }
+    }
+
     @OnMessage
     public void onMessage(String message, Session session) {
         // 从Client接收消息
@@ -112,6 +131,8 @@ public class WebSocketServer {
             startMatching();
         }else if("stop-matching".equals(event)){
             stopMatching();
+        }else if("move".equals(event)){
+            move(data.getInteger("direction"));
         }
     }
 
